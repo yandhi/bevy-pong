@@ -46,6 +46,10 @@ fn main() {
                 move_player
                     .before(check_for_collisions)
                     .after(apply_velocity),
+
+                move_bot
+                    .before(check_for_collisions)
+                    .after(apply_velocity),
             )
                 .in_schedule(CoreSchedule::FixedUpdate),
         )
@@ -59,7 +63,10 @@ fn main() {
 struct Player;
 
 #[derive(Component)]
-struct Bot;
+struct Name(String);
+
+#[derive(Component, Deref, DerefMut)]
+struct Flip(bool);
 
 /// 1:1 from bevy examples
 #[derive(Component)]
@@ -165,6 +172,7 @@ fn setup(mut commands: Commands,
             ..default()
         },
         Player,
+        Name("Player".to_string()),
         Collider,
     ));
 
@@ -185,7 +193,9 @@ fn setup(mut commands: Commands,
             },
             ..default()
         },
-        Bot,
+        Player,
+        Name("Bot".to_string()),
+        Flip(false),
         Collider,
     ));
 
@@ -211,25 +221,55 @@ fn setup(mut commands: Commands,
 // Systems
 
 fn move_player(keyboard_input: Res<Input<KeyCode>>,
-               mut query: Query<&mut Transform, With<Player>>) {
-    let mut player_transform = query.single_mut();
+               mut query: Query<(&Name, &mut Transform, Option<&Player>)>) {
+    for (name, mut transform, player) in query.iter_mut() {
+        if name.0 == "Player".to_string() {
+            let mut direction = 0.0;
 
-    let mut direction = 0.0;
+            if keyboard_input.pressed(KeyCode::Up) {
+                direction += 10.0;
+            }
 
-    if keyboard_input.pressed(KeyCode::Up) {
-        direction += 10.0;
+            if keyboard_input.pressed(KeyCode::Down) {
+                direction -= 10.0;
+            }
+
+            let new_player_position = transform.translation.y + direction * PLAYER_SPEED * TIME_STEP;
+
+            let upper_bound = TOP_WALL - WALL_THICKNESS / 2.0 - ENT_SIZE.x / 2.0;
+            let lower_bound = BOTTOM_WALL + WALL_THICKNESS / 2.0 + ENT_SIZE.x / 2.0;
+
+            transform.translation.y = new_player_position.clamp(lower_bound, upper_bound);
+        }
     }
+}
 
-    if keyboard_input.pressed(KeyCode::Down) {
-        direction -= 10.0;
+// keep our bot moving up and down!
+fn move_bot(mut query: Query<(&Name, &mut Flip, &mut Transform,Option<&Player>)>) {
+    for (name, mut flip, mut transform, player) in query.iter_mut() {
+        if name.0 == "Bot".to_string() {
+            let upper_bound = TOP_WALL - WALL_THICKNESS / 2.0 - ENT_SIZE.x / 2.0;
+            let lower_bound = BOTTOM_WALL + WALL_THICKNESS / 2.0 + ENT_SIZE.x / 2.0;
+
+            let mut new_bot_pos = transform.translation.y;
+
+            if !flip.0 {
+                new_bot_pos = transform.translation.y + 350. * TIME_STEP;
+            }
+
+            if flip.0 {
+                new_bot_pos = transform.translation.y - 350. * TIME_STEP;
+            }
+
+            transform.translation.y = new_bot_pos.clamp(lower_bound, upper_bound);
+
+            if(transform.translation.y >= TOP_WALL - 20.) {
+                flip.0 = true;
+            } else if(transform.translation.y <= BOTTOM_WALL + 20.) {
+                flip.0 = false;
+            }
+        }
     }
-
-    let new_player_position = player_transform.translation.y + direction * PLAYER_SPEED * TIME_STEP;
-
-    let upper_bound = TOP_WALL - WALL_THICKNESS / 2.0 - ENT_SIZE.x / 2.0;
-    let lower_bound = BOTTOM_WALL + WALL_THICKNESS / 2.0 + ENT_SIZE.x / 2.0;
-
-    player_transform.translation.y = new_player_position.clamp(lower_bound, upper_bound);
 }
 
 fn apply_velocity(mut query: Query<(&mut Transform, &Velocity)>) {
@@ -242,14 +282,14 @@ fn apply_velocity(mut query: Query<(&mut Transform, &Velocity)>) {
 fn check_for_collisions(
     mut commands: Commands,
     mut ball_query: Query<(&mut Velocity, &Transform), With<Ball>>,
-    collider_query: Query<(Entity, &Transform), With<Collider>>,
+    collider_query: Query<(Entity, &Transform, Option<&Player>), With<Collider>>,
     mut collision_events: EventWriter<CollisionEvent>,
 ) {
     let (mut ball_velocity, ball_transform) = ball_query.single_mut();
     let ball_size = ball_transform.scale.truncate();
 
     // check collision with walls
-    for (collider_entity, transform) in &collider_query {
+    for (collider_entity, transform, player) in &collider_query {
         let collision = collide(
             ball_transform.translation,
             ball_size,
@@ -267,8 +307,12 @@ fn check_for_collisions(
             // only reflect if the ball's velocity is going in the opposite direction of the
             // collision
             match collision {
-                Collision::Left => reflect_x = ball_velocity.x > 0.0,
-                Collision::Right => reflect_x = ball_velocity.x < 0.0,
+                Collision::Left => {
+                    reflect_x = ball_velocity.x > 0.0;
+                },
+                Collision::Right => {
+                    reflect_x = ball_velocity.x < 0.0;
+                }
                 Collision::Top => reflect_y = ball_velocity.y < 0.0,
                 Collision::Bottom => reflect_y = ball_velocity.y > 0.0,
                 Collision::Inside => { /* do nothing */ }
