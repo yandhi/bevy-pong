@@ -310,9 +310,17 @@ fn check_for_collisions(
             match collision {
                 Collision::Left => {
                     reflect_x = ball_velocity.x > 0.0;
+
+                    if player.is_none() {
+                        println!("player score")
+                    }
                 }
                 Collision::Right => {
                     reflect_x = ball_velocity.x < 0.0;
+
+                    if player.is_none() {
+                        println!("bot score")
+                    }
                 }
                 Collision::Top => reflect_y = ball_velocity.y < 0.0,
                 Collision::Bottom => reflect_y = ball_velocity.y > 0.0,
