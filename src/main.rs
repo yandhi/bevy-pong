@@ -3,6 +3,7 @@ use bevy::{
     sprite::collide_aabb::{collide, Collision},
     sprite::MaterialMesh2dBundle,
 };
+
 /// bevy pong where you play against an eternally moving player 2!
 
 
@@ -46,7 +47,6 @@ fn main() {
                 move_player
                     .before(check_for_collisions)
                     .after(apply_velocity),
-
                 move_bot
                     .before(check_for_collisions)
                     .after(apply_velocity),
@@ -84,14 +84,14 @@ struct CollisionEvent;
 #[derive(Bundle)]
 struct WallBundle {
     sprite_bundle: SpriteBundle,
-    collider: Collider
+    collider: Collider,
 }
 
 enum WallLocation {
     Left,
     Right,
     Bottom,
-    Top
+    Top,
 }
 
 impl WallLocation {
@@ -141,6 +141,7 @@ impl WallBundle {
         }
     }
 }
+
 /// until here
 
 /// Startup Systems
@@ -245,7 +246,7 @@ fn move_player(keyboard_input: Res<Input<KeyCode>>,
 }
 
 // keep our bot moving up and down!
-fn move_bot(mut query: Query<(&Name, &mut Flip, &mut Transform,Option<&Player>)>) {
+fn move_bot(mut query: Query<(&Name, &mut Flip, &mut Transform, Option<&Player>)>) {
     for (name, mut flip, mut transform, player) in query.iter_mut() {
         if name.0 == "Bot".to_string() {
             let upper_bound = TOP_WALL - WALL_THICKNESS / 2.0 - ENT_SIZE.x / 2.0;
@@ -263,9 +264,9 @@ fn move_bot(mut query: Query<(&Name, &mut Flip, &mut Transform,Option<&Player>)>
 
             transform.translation.y = new_bot_pos.clamp(lower_bound, upper_bound);
 
-            if(transform.translation.y >= TOP_WALL - 20.) {
+            if transform.translation.y >= TOP_WALL - 20. {
                 flip.0 = true;
-            } else if(transform.translation.y <= BOTTOM_WALL + 20.) {
+            } else if transform.translation.y <= BOTTOM_WALL + 20. {
                 flip.0 = false;
             }
         }
@@ -309,7 +310,7 @@ fn check_for_collisions(
             match collision {
                 Collision::Left => {
                     reflect_x = ball_velocity.x > 0.0;
-                },
+                }
                 Collision::Right => {
                     reflect_x = ball_velocity.x < 0.0;
                 }
